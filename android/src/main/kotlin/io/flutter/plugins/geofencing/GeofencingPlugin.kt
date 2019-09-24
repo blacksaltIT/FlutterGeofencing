@@ -179,6 +179,7 @@ class GeofencingPlugin(context: Context, activity: Activity?) : MethodCallHandle
             geofencingClient.removeGeofences(ids).run {
                 addOnSuccessListener {
                     result.success(true)
+                    Log.i(TAG, "Successfully removed geofence")
                     for (id in ids) {
                         removeGeofenceFromCache(context, id)
                     }
