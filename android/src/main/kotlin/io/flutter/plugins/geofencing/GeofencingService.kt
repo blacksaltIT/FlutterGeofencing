@@ -8,6 +8,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import android.os.PowerManager
+import android.os.Handler;
+import android.os.Looper;
 import androidx.core.app.JobIntentService
 import android.util.Log
 import io.flutter.plugin.common.MethodChannel
@@ -22,6 +24,7 @@ import io.flutter.view.FlutterRunArguments
 import java.util.ArrayDeque
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.UUID
+import kotlinx.coroutines.*
 
 import com.google.android.gms.location.GeofencingEvent
 
@@ -29,7 +32,7 @@ class GeofencingService : MethodCallHandler, JobIntentService() {
     private val queue = ArrayDeque<List<Any>>()
     private lateinit var mBackgroundChannel: MethodChannel
     private lateinit var mContext: Context
-
+    
     companion object {
         @JvmStatic
         private val TAG = "GeofencingService"
@@ -82,12 +85,14 @@ class GeofencingService : MethodCallHandler, JobIntentService() {
                 IsolateHolderService.setBackgroundFlutterView(sBackgroundFlutterView)
             }
         }
+        
         mBackgroundChannel = MethodChannel(sBackgroundFlutterView,
                 "plugins.flutter.io/geofencing_plugin_background")
         mBackgroundChannel.setMethodCallHandler(this)
     }
 
    override fun onMethodCall(call: MethodCall, result: Result) {
+       Log.i(TAG, "Method called: ${call.method}")
        when(call.method) {
             "GeofencingService.initialized" -> {
                 synchronized(sServiceStarted) {
@@ -140,13 +145,18 @@ class GeofencingService : MethodCallHandler, JobIntentService() {
                 locationList,
                 geofenceTransition)
 
+        Log.i(TAG, "onMethodCall called: ${geofenceUpdateList}")
+
         synchronized(sServiceStarted) {
             if (!sServiceStarted.get()) {
                 // Queue up geofencing events while background isolate is starting
                 queue.add(geofenceUpdateList)
             } else {
                 // Callback method name is intentionally left blank.
-                mBackgroundChannel.invokeMethod("", geofenceUpdateList)
+                Handler(Looper.getMainLooper()).post({
+                    Log.i(TAG, "Runnable called: ${geofenceUpdateList}")
+                    mBackgroundChannel.invokeMethod("", geofenceUpdateList)
+                })
             }
         }
     }
